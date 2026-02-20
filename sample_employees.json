@@ -1,0 +1,41 @@
+{
+  "EMP001": {
+    "id": "EMP001",
+    "name": "Ahmed Hassan",
+    "email": "ahmed.hassan@example.com",
+    "department": "IT",
+    "position": "Software Developer",
+    "join_date": "2023-01-15",
+    "employment_type": "Full-time",
+    "annual_leave_balance": 30.0,
+    "status": "Active",
+    "nationality": "UAE",
+    "gender": "Male"
+  },
+  "EMP002": {
+    "id": "EMP002",
+    "name": "Fatima Zahra",
+    "email": "fatima.zahra@example.com",
+    "department": "HR",
+    "position": "HR Manager",
+    "join_date": "2022-06-01",
+    "employment_type": "Full-time",
+    "annual_leave_balance": 25.0,
+    "status": "Active",
+    "nationality": "UAE",
+    "gender": "Female"
+  },
+  "EMP003": {
+    "id": "EMP003",
+    "name": "Mohammed Ali",
+    "email": "mohammed.ali@example.com",
+    "department": "Finance",
+    "position": "Accountant",
+    "join_date": "2021-03-10",
+    "employment_type": "Full-time",
+    "annual_leave_balance": 30.0,
+    "status": "Active",
+    "nationality": "Egypt",
+    "gender": "Male"
+  }
+}
