@@ -15,6 +15,7 @@ from collections import defaultdict
 import hashlib
 import secrets
 import re
+import time
 
 # ============== CONFIGURATION ==============
 DATA_FILE = "leave_data.json"
@@ -3078,6 +3079,167 @@ def render_change_password(data_manager: DataManager):
             st.info("🔒 Your password has been updated. Please use the new password for your next login.")
 
 
+def render_settings(data_manager: DataManager):
+    """Render settings page with app reset functionality (Admin only)"""
+    st.header("⚙️ Settings")
+    
+    # Show current data stats
+    st.subheader("📊 Current Data Overview")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Employees", len(data_manager.employees))
+    with col2:
+        st.metric("Total Users", len(data_manager.users))
+    with col3:
+        st.metric("Leave Requests", len(data_manager.leave_requests))
+    with col4:
+        active_requests = sum(1 for r in data_manager.leave_requests.values() if r.status == "Pending")
+        st.metric("Pending Requests", active_requests)
+    
+    st.markdown("---")
+    
+    # Danger Zone - Reset Application
+    st.subheader("🚨 Danger Zone")
+    
+    with st.container():
+        st.markdown("""
+        <div style="background-color: #5c1a1a; padding: 20px; border-radius: 10px; border: 2px solid #ff4444;">
+            <h3 style="color: #ff4444; margin-top: 0;">⚠️ Reset Application</h3>
+            <p style="color: #ffffff;">
+                This will permanently delete <strong>ALL DATA</strong> including:
+            </p>
+            <ul style="color: #ffcccc;">
+                <li>All employee records</li>
+                <li>All user accounts (except you'll be logged out)</li>
+                <li>All leave requests and history</li>
+                <li>All settings and configurations</li>
+            </ul>
+            <p style="color: #ffff00; font-weight: bold;">
+                This action cannot be undone!
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Step 1: Show confirmation checkbox
+        confirm_reset = st.checkbox("I understand this will delete all data permanently", key="confirm_reset")
+        
+        if confirm_reset:
+            # Step 2: Type confirmation code
+            st.warning("Please type **DELETE ALL** to confirm:")
+            confirmation_code = st.text_input("Confirmation Code", placeholder="Type DELETE ALL here", key="reset_code")
+            
+            if confirmation_code == "DELETE ALL":
+                # Step 3: Final confirmation button
+                st.error("🔴 FINAL WARNING: This action is irreversible!")
+                
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("🗑️ RESET APP", type="primary", use_container_width=True):
+                        try:
+                            # Clear all data
+                            data_manager.employees = {}
+                            data_manager.users = {}
+                            data_manager.leave_requests = {}
+                            
+                            # Delete data files
+                            for file_path in [EMPLOYEES_FILE, USERS_FILE, DATA_FILE]:
+                                if os.path.exists(file_path):
+                                    try:
+                                        os.remove(file_path)
+                                    except:
+                                        pass
+                            
+                            # Success message
+                            st.success("✅ Application has been reset successfully!")
+                            st.balloons()
+                            
+                            st.markdown("""
+                            <div style="background-color: #1a5c1a; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                                <h4 style="color: #ffffff; margin-top: 0;">🔄 Reset Complete</h4>
+                                <p style="color: #ffffff;">
+                                    All data has been cleared. The app will now reload with default settings.
+                                </p>
+                                <p style="color: #ffff00;">
+                                    <strong>Default Login:</strong><br>
+                                    Username: <code>admin</code><br>
+                                    Password: <code>admin123</code>
+                                </p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Force logout and reload
+                            st.session_state.authenticated = False
+                            st.session_state.current_user = None
+                            st.session_state.user_role = None
+                            st.session_state.employee_id = None
+                            
+                            st.info("🔄 Reloading app in 3 seconds...")
+                            time.sleep(3)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error during reset: {str(e)}")
+                
+                with col2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.caption("Clicking this button will immediately erase all data")
+            elif confirmation_code and confirmation_code != "DELETE ALL":
+                st.error("❌ Incorrect confirmation code. Please type exactly: DELETE ALL")
+    
+    st.markdown("---")
+    
+    # Backup Section
+    st.subheader("💾 Data Backup")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Export All Data**")
+        if st.button("📥 Download Backup JSON Files", use_container_width=True):
+            # Create a zip of all data files
+            import zipfile
+            import io
+            
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Add employees
+                if data_manager.employees:
+                    emp_json = json.dumps({k: v.to_dict() for k, v in data_manager.employees.items()}, indent=2)
+                    zip_file.writestr('employees_backup.json', emp_json)
+                
+                # Add users
+                if data_manager.users:
+                    users_json = json.dumps({k: v.to_dict() for k, v in data_manager.users.items()}, indent=2)
+                    zip_file.writestr('users_backup.json', users_json)
+                
+                # Add leave requests
+                if data_manager.leave_requests:
+                    leaves_json = json.dumps({k: v.to_dict() for k, v in data_manager.leave_requests.items()}, indent=2)
+                    zip_file.writestr('leave_data_backup.json', leaves_json)
+            
+            zip_buffer.seek(0)
+            st.download_button(
+                label="📦 Download ZIP Backup",
+                data=zip_buffer.getvalue(),
+                file_name=f"leave_system_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+    
+    with col2:
+        st.markdown("**System Info**")
+        st.markdown(f"""
+        - **App Version:** 1.0.0
+        - **Data Files:** JSON (Local Storage)
+        - **Employees:** {len(data_manager.employees)}
+        - **Users:** {len(data_manager.users)}
+        - **Leave Records:** {len(data_manager.leave_requests)}
+        """)
+
+
 def main():
     """Main application function with authentication"""
     st.set_page_config(
@@ -3125,7 +3287,7 @@ def main():
             menu = st.radio(
                 "Navigation",
                 ["📊 Dashboard", "👥 Employees", "👤 User Management", "✅ Approvals", 
-                 "📅 Calendar", "📖 UAE Entitlements", "📊 Reports", "🔐 Change Password"]
+                 "📅 Calendar", "📖 UAE Entitlements", "📊 Reports", "🔐 Change Password", "⚙️ Settings"]
             )
         elif user_role == "manager":
             menu = st.radio(
@@ -3175,6 +3337,8 @@ def main():
             render_reports(data_manager)
         elif menu == "🔐 Change Password":
             render_change_password(data_manager)
+        elif menu == "⚙️ Settings":
+            render_settings(data_manager)
     
     elif user_role == "manager":
         if menu == "📊 Dashboard":
