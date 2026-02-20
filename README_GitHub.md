@@ -72,13 +72,15 @@ Open your browser and navigate to: `http://localhost:8501`
 
 ---
 
-## 🔑 Default Login Credentials
+## 🔐 Security First
 
-| Role | Username | Password |
-|------|----------|----------|
-| Admin | `admin` | `admin123` |
-| Manager | `manager` | `manager123` |
-| Employee | `ahmed.hassan` | `employee123` |
+After first login, **immediately change default passwords** using the "🔐 Change Password" menu option.
+
+| Role | Default Username | Default Password | Action Required |
+|------|------------------|------------------|-----------------|
+| Admin | `admin` | `admin123` | ⚠️ Change after first login |
+| Manager | `manager` | `manager123` | ⚠️ Change after first login |
+| Employee | (auto-generated) | (auto-generated) | Change via User Management |
 
 ---
 
@@ -168,10 +170,25 @@ dept_options = ["Administration", "Finance", "HR", "IT", ...]
 ### Modifying Leave Types
 Edit the `LEAVE_TYPES` dictionary in the configuration section.
 
-### Changing Password
-1. Log in as admin
-2. Go to "User Management"
-3. Select user and update password
+### Changing Your Password
+1. Log in to the system
+2. Click on "🔐 Change Password" in the navigation menu (Admin & Manager)
+3. Enter current password and new password
+4. Click "Change Password"
+
+### Bulk Importing Employees
+1. Go to "👥 Employee Management"
+2. Click on "📥 Bulk Import" tab
+3. Select import format (JSON or Excel/CSV)
+4. Upload your file
+5. Configure options (skip existing, create user accounts)
+6. Click "Import Employees"
+
+**Supported File Formats:**
+- **JSON**: `employees.json` format with employee objects
+- **Excel/CSV**: Columns: `id`, `name`, `email`, `department`, `position`, `join_date`
+
+After import, you'll receive a CSV file with auto-generated login credentials.
 
 ---
 

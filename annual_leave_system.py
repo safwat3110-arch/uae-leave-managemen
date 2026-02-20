@@ -360,24 +360,35 @@ class DataManager:
     def load_data(self):
         """Load data from JSON files"""
         if os.path.exists(EMPLOYEES_FILE):
-            with open(EMPLOYEES_FILE, 'r') as f:
-                data = json.load(f)
-                self.employees = {k: Employee.from_dict(v) for k, v in data.items()}
-        else:
-            # Create sample data
+            try:
+                with open(EMPLOYEES_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.employees = {k: Employee.from_dict(v) for k, v in data.items()}
+            except (json.JSONDecodeError, IOError):
+                self.employees = {}
+        
+        # Create sample employees if none exist
+        if not self.employees:
             self._create_sample_employees()
         
         if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as f:
-                data = json.load(f)
-                self.leave_requests = {k: LeaveRequest.from_dict(v) for k, v in data.items()}
+            try:
+                with open(DATA_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.leave_requests = {k: LeaveRequest.from_dict(v) for k, v in data.items()}
+            except (json.JSONDecodeError, IOError):
+                self.leave_requests = {}
         
         if os.path.exists(USERS_FILE):
-            with open(USERS_FILE, 'r') as f:
-                data = json.load(f)
-                self.users = {k: User.from_dict(v) for k, v in data.items()}
-        else:
-            # Create default admin user
+            try:
+                with open(USERS_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.users = {k: User.from_dict(v) for k, v in data.items()}
+            except (json.JSONDecodeError, IOError):
+                self.users = {}
+        
+        # Create default users if none exist (fresh deployment or reset)
+        if not self.users:
             self._create_default_users()
     
     def save_data(self):
