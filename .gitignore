@@ -124,6 +124,7 @@ cython_debug/
 !sample_employees.json
 !sample_users.json
 !sample_leave_data.json
+!IMPORT_GUIDE.md
 
 # Real data files (will be created on first run)
 # These are excluded to prevent accidental commits of real employee data

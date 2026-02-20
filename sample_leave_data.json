@@ -1,0 +1,44 @@
+{
+  "LEAVE001": {
+    "id": "LEAVE001",
+    "employee_id": "EMP001",
+    "leave_type": "Annual Leave",
+    "start_date": "2024-03-01",
+    "end_date": "2024-03-05",
+    "days_requested": 5,
+    "reason": "Family vacation to visit parents",
+    "status": "Manager_Approved",
+    "submitted_date": "2024-02-15 10:30:00",
+    "approved_by": "manager",
+    "approved_date": "2024-02-16",
+    "comments": "Approved as requested. Enjoy your vacation!"
+  },
+  "LEAVE002": {
+    "id": "LEAVE002",
+    "employee_id": "EMP002",
+    "leave_type": "Sick Leave",
+    "start_date": "2024-02-20",
+    "end_date": "2024-02-22",
+    "days_requested": 3,
+    "reason": "Flu recovery",
+    "status": "Manager_Approved",
+    "submitted_date": "2024-02-19 09:00:00",
+    "approved_by": "admin",
+    "approved_date": "2024-02-19",
+    "comments": "Get well soon"
+  },
+  "LEAVE003": {
+    "id": "LEAVE003",
+    "employee_id": "EMP003",
+    "leave_type": "Annual Leave",
+    "start_date": "2024-04-10",
+    "end_date": "2024-04-15",
+    "days_requested": 6,
+    "reason": "Umrah trip",
+    "status": "Pending",
+    "submitted_date": "2024-03-01 14:20:00",
+    "approved_by": null,
+    "approved_date": null,
+    "comments": ""
+  }
+}

@@ -1026,20 +1026,16 @@ def render_employee_management(data_manager: DataManager):
         st.subheader("📥 Bulk Data Import")
         
         st.markdown("""
-        This feature allows you to import multiple employees at once using a JSON file.
-        
-        **Supported Formats:**
-        - Employee JSON (employees.json format)
-        - Excel/CSV files with employee data
+        Import employees and leave records in bulk using JSON, Excel, or CSV files.
         """)
         
         import_type = st.selectbox(
             "Select Import Type",
-            ["Employee Data (JSON)", "Employee Data (Excel/CSV)"],
-            help="Choose the type of file you want to import"
+            ["👤 Employee Data (JSON)", "👤 Employee Data (Excel/CSV)", "📅 Leave Data (JSON)", "📅 Leave Data (Excel/CSV)"],
+            help="Choose the type of data you want to import"
         )
         
-        if import_type == "Employee Data (JSON)":
+        if import_type == "👤 Employee Data (JSON)":
             st.markdown("""
             **JSON File Format:**
             ```json
@@ -1207,7 +1203,7 @@ def render_employee_management(data_manager: DataManager):
                 except Exception as e:
                     st.error(f"❌ Error reading file: {str(e)}")
         
-        elif import_type == "Employee Data (Excel/CSV)":
+        elif import_type == "👤 Employee Data (Excel/CSV)":
             st.markdown("""
             **Excel/CSV File Format:**
             Required columns: `id`, `name`, `email`, `department`, `position`, `join_date`
@@ -1337,6 +1333,303 @@ def render_employee_management(data_manager: DataManager):
                                 file_name=f"employee_credentials_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                                 mime="text/csv"
                             )
+                        
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"❌ Error reading file: {str(e)}")
+        
+        elif import_type == "📅 Leave Data (JSON)":
+            st.markdown("""
+            **Leave Data JSON Format:**
+            ```json
+            {
+                "LEAVE001": {
+                    "id": "LEAVE001",
+                    "employee_id": "EMP001",
+                    "leave_type": "Annual Leave",
+                    "start_date": "2024-03-01",
+                    "end_date": "2024-03-05",
+                    "days_requested": 5,
+                    "reason": "Family vacation",
+                    "status": "Manager_Approved",
+                    "submitted_date": "2024-02-15",
+                    "approved_by": "admin",
+                    "approved_date": "2024-02-16",
+                    "comments": "Approved as requested"
+                }
+            }
+            ```
+            **Status options:** `Pending`, `Admin_Approved`, `Manager_Approved`, `Rejected`, `Cancelled`
+            """)
+            
+            uploaded_file = st.file_uploader(
+                "Upload Leave Data JSON File",
+                type=['json'],
+                help="Upload your leave_data.json file"
+            )
+            
+            if uploaded_file is not None:
+                try:
+                    data = json.load(uploaded_file)
+                    
+                    st.markdown(f"**Preview:** Found {len(data)} leave record(s)")
+                    
+                    # Show preview
+                    preview_data = []
+                    for leave_id, leave_data in list(data.items())[:5]:
+                        emp = data_manager.employees.get(leave_data.get("employee_id", ""))
+                        preview_data.append({
+                            "ID": leave_id,
+                            "Employee": emp.name if emp else leave_data.get("employee_id", "N/A"),
+                            "Type": leave_data.get("leave_type", "N/A"),
+                            "From": leave_data.get("start_date", "N/A"),
+                            "To": leave_data.get("end_date", "N/A"),
+                            "Status": leave_data.get("status", "N/A")
+                        })
+                    
+                    st.dataframe(pd.DataFrame(preview_data))
+                    
+                    if len(data) > 5:
+                        st.info(f"... and {len(data) - 5} more")
+                    
+                    # Import options
+                    skip_invalid = st.checkbox("Skip records for non-existing employees", value=True,
+                        help="Skip leave records if employee ID doesn't exist")
+                    
+                    update_balance = st.checkbox("Deduct leave balance for approved leaves", value=False,
+                        help="Update employee leave balance (use with caution)")
+                    
+                    if st.button("🚀 Import Leave Data", type="primary"):
+                        success_count = 0
+                        skipped_count = 0
+                        error_count = 0
+                        invalid_employees = []
+                        
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for i, (leave_id, leave_data) in enumerate(data.items()):
+                            progress = (i + 1) / len(data)
+                            progress_bar.progress(progress)
+                            
+                            emp_id = leave_data.get("employee_id", "")
+                            status_text.text(f"Processing {i+1} of {len(data)}: {leave_id}")
+                            
+                            try:
+                                # Check if employee exists
+                                if emp_id not in data_manager.employees:
+                                    if skip_invalid:
+                                        skipped_count += 1
+                                        invalid_employees.append(emp_id)
+                                        continue
+                                    else:
+                                        st.warning(f"Employee {emp_id} not found, but importing anyway")
+                                
+                                # Create LeaveRequest object
+                                leave_request = LeaveRequest(
+                                    id=leave_data.get("id", leave_id),
+                                    employee_id=emp_id,
+                                    leave_type=leave_data.get("leave_type", "Annual Leave"),
+                                    start_date=leave_data.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                                    end_date=leave_data.get("end_date", datetime.now().strftime("%Y-%m-%d")),
+                                    days_requested=leave_data.get("days_requested", 0),
+                                    reason=leave_data.get("reason", ""),
+                                    status=leave_data.get("status", "Pending"),
+                                    submitted_date=leave_data.get("submitted_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                                    approved_by=leave_data.get("approved_by"),
+                                    approved_date=leave_data.get("approved_date"),
+                                    comments=leave_data.get("comments", "")
+                                )
+                                
+                                data_manager.add_leave_request(leave_request)
+                                success_count += 1
+                                
+                                # Update leave balance if requested and approved
+                                if update_balance and leave_request.status == "Manager_Approved":
+                                    emp = data_manager.employees.get(emp_id)
+                                    if emp:
+                                        new_balance = emp.annual_leave_balance - leave_request.days_requested
+                                        data_manager.update_employee(emp_id, annual_leave_balance=new_balance)
+                                
+                            except Exception as e:
+                                error_count += 1
+                                st.error(f"Error importing {leave_id}: {str(e)}")
+                        
+                        progress_bar.empty()
+                        status_text.empty()
+                        
+                        # Show results
+                        st.success(f"✅ Import Complete!")
+                        st.markdown(f"""
+                        **Results:**
+                        - ✅ Successfully imported: {success_count}
+                        - ⏭️ Skipped (invalid employee): {skipped_count}
+                        - ❌ Errors: {error_count}
+                        """)
+                        
+                        if invalid_employees and skip_invalid:
+                            st.warning(f"⚠️ Skipped records for non-existing employees: {', '.join(set(invalid_employees))}")
+                        
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"❌ Error reading file: {str(e)}")
+        
+        elif import_type == "📅 Leave Data (Excel/CSV)":
+            st.markdown("""
+            **Leave Data Excel/CSV Format:**
+            Required columns: `id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `days_requested`
+            
+            Optional columns: `reason`, `status`, `submitted_date`, `approved_by`, `approved_date`, `comments`
+            
+            **Supported date formats:** YYYY-MM-DD or DD/MM/YYYY
+            """)
+            
+            uploaded_file = st.file_uploader(
+                "Upload Leave Data Excel or CSV File",
+                type=['xlsx', 'csv'],
+                help="Upload your leave data file"
+            )
+            
+            if uploaded_file is not None:
+                try:
+                    if uploaded_file.name.endswith('.csv'):
+                        df = pd.read_csv(uploaded_file)
+                    else:
+                        df = pd.read_excel(uploaded_file)
+                    
+                    st.markdown(f"**Preview:** {len(df)} leave record(s) found")
+                    
+                    # Map common column name variations
+                    column_mapping = {
+                        'employee id': 'employee_id',
+                        'emp_id': 'employee_id',
+                        'emp id': 'employee_id',
+                        'leave type': 'leave_type',
+                        'type': 'leave_type',
+                        'start date': 'start_date',
+                        'from': 'start_date',
+                        'from_date': 'start_date',
+                        'end date': 'end_date',
+                        'to': 'end_date',
+                        'to_date': 'end_date',
+                        'days': 'days_requested',
+                        'num_days': 'days_requested',
+                        'number_of_days': 'days_requested'
+                    }
+                    
+                    # Rename columns (case insensitive)
+                    df.columns = [column_mapping.get(col.lower().strip(), col) for col in df.columns]
+                    
+                    st.dataframe(df.head(10))
+                    
+                    # Import options
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        skip_invalid = st.checkbox("Skip records for non-existing employees", value=True)
+                    with col2:
+                        update_balance = st.checkbox("Deduct leave balance for approved leaves", value=False)
+                    
+                    if st.button("🚀 Import Leave Data", type="primary"):
+                        success_count = 0
+                        skipped_count = 0
+                        error_count = 0
+                        invalid_employees = []
+                        
+                        progress_bar = st.progress(0)
+                        
+                        for i, row in df.iterrows():
+                            progress = (i + 1) / len(df)
+                            progress_bar.progress(progress)
+                            
+                            try:
+                                leave_id = str(row.get('id', f"LEAVE{i+1:05d}"))
+                                emp_id = str(row.get('employee_id', ''))
+                                
+                                # Check if employee exists
+                                if emp_id not in data_manager.employees:
+                                    if skip_invalid:
+                                        skipped_count += 1
+                                        invalid_employees.append(emp_id)
+                                        continue
+                                
+                                # Parse dates
+                                start_date = str(row.get('start_date', ''))
+                                end_date = str(row.get('end_date', ''))
+                                
+                                # Try different date formats
+                                for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y"]:
+                                    try:
+                                        if pd.notna(row.get('start_date')):
+                                            start_date = pd.to_datetime(row.get('start_date')).strftime("%Y-%m-%d")
+                                        if pd.notna(row.get('end_date')):
+                                            end_date = pd.to_datetime(row.get('end_date')).strftime("%Y-%m-%d")
+                                        break
+                                    except:
+                                        continue
+                                
+                                # Get days requested
+                                days = row.get('days_requested', 0)
+                                if pd.isna(days):
+                                    days = 0
+                                else:
+                                    days = int(float(days))
+                                
+                                # Get status with default
+                                status = str(row.get('status', 'Pending'))
+                                if status.lower() in ['approved', 'manager_approved', 'final approved']:
+                                    status = 'Manager_Approved'
+                                elif status.lower() in ['admin_approved', 'level 1 approved']:
+                                    status = 'Admin_Approved'
+                                elif status.lower() in ['rejected', 'declined', 'denied']:
+                                    status = 'Rejected'
+                                elif status.lower() in ['cancelled', 'canceled']:
+                                    status = 'Cancelled'
+                                else:
+                                    status = 'Pending'
+                                
+                                leave_request = LeaveRequest(
+                                    id=leave_id,
+                                    employee_id=emp_id,
+                                    leave_type=str(row.get('leave_type', 'Annual Leave')),
+                                    start_date=start_date if start_date else datetime.now().strftime("%Y-%m-%d"),
+                                    end_date=end_date if end_date else datetime.now().strftime("%Y-%m-%d"),
+                                    days_requested=days,
+                                    reason=str(row.get('reason', '')) if pd.notna(row.get('reason')) else '',
+                                    status=status,
+                                    submitted_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    approved_by=str(row.get('approved_by')) if pd.notna(row.get('approved_by')) else None,
+                                    approved_date=str(row.get('approved_date')) if pd.notna(row.get('approved_date')) else None,
+                                    comments=str(row.get('comments', '')) if pd.notna(row.get('comments')) else ''
+                                )
+                                
+                                data_manager.add_leave_request(leave_request)
+                                success_count += 1
+                                
+                                # Update leave balance if requested and approved
+                                if update_balance and status == 'Manager_Approved':
+                                    emp = data_manager.employees.get(emp_id)
+                                    if emp:
+                                        new_balance = emp.annual_leave_balance - days
+                                        data_manager.update_employee(emp_id, annual_leave_balance=new_balance)
+                                
+                            except Exception as e:
+                                error_count += 1
+                                st.error(f"Error on row {i+1}: {str(e)}")
+                        
+                        progress_bar.empty()
+                        
+                        st.success(f"✅ Import Complete!")
+                        st.markdown(f"""
+                        **Results:**
+                        - ✅ Successfully imported: {success_count}
+                        - ⏭️ Skipped (invalid employee): {skipped_count}
+                        - ❌ Errors: {error_count}
+                        """)
+                        
+                        if invalid_employees and skip_invalid:
+                            st.warning(f"⚠️ Skipped records for non-existing employees: {', '.join(set(invalid_employees))}")
                         
                         st.rerun()
                         
