@@ -3107,14 +3107,17 @@ def render_settings(data_manager: DataManager):
         <div style="background-color: #5c1a1a; padding: 20px; border-radius: 10px; border: 2px solid #ff4444;">
             <h3 style="color: #ff4444; margin-top: 0;">⚠️ Reset Application</h3>
             <p style="color: #ffffff;">
-                This will permanently delete <strong>ALL DATA</strong> including:
+                This will permanently delete <strong>ALL DATA</strong> and reset to defaults:
             </p>
             <ul style="color: #ffcccc;">
-                <li>All employee records</li>
-                <li>All user accounts (except you'll be logged out)</li>
-                <li>All leave requests and history</li>
-                <li>All settings and configurations</li>
+                <li>All employee records (reset to sample data)</li>
+                <li>All user accounts (reset to default)</li>
+                <li>All leave requests and history (deleted)</li>
+                <li>Admin password reset to: <code>admin123</code></li>
             </ul>
+            <p style="color: #00ff00; font-weight: bold;">
+                ✅ You will stay logged in as admin after reset
+            </p>
             <p style="color: #ffff00; font-weight: bold;">
                 This action cannot be undone!
             </p>
@@ -3139,6 +3142,9 @@ def render_settings(data_manager: DataManager):
                 with col1:
                     if st.button("🗑️ RESET APP", type="primary", use_container_width=True):
                         try:
+                            # Store current admin username before reset
+                            current_admin = st.session_state.current_user
+                            
                             # Clear all data
                             data_manager.employees = {}
                             data_manager.users = {}
@@ -3152,6 +3158,25 @@ def render_settings(data_manager: DataManager):
                                     except:
                                         pass
                             
+                            # Recreate fresh default data
+                            data_manager._create_sample_employees()
+                            data_manager._create_default_users()
+                            
+                            # Update admin password to default (admin123)
+                            auth = AuthManager()
+                            default_admin_hash, default_admin_salt = auth.hash_password("admin123")
+                            data_manager.update_user(
+                                "admin",
+                                password_hash=default_admin_hash,
+                                salt=default_admin_salt
+                            )
+                            
+                            # Keep admin logged in
+                            st.session_state.current_user = "admin"
+                            st.session_state.user_role = "admin"
+                            st.session_state.employee_id = "EMP004"  # Admin's employee ID
+                            st.session_state.authenticated = True
+                            
                             # Success message
                             st.success("✅ Application has been reset successfully!")
                             st.balloons()
@@ -3160,24 +3185,18 @@ def render_settings(data_manager: DataManager):
                             <div style="background-color: #1a5c1a; padding: 20px; border-radius: 10px; margin: 20px 0;">
                                 <h4 style="color: #ffffff; margin-top: 0;">🔄 Reset Complete</h4>
                                 <p style="color: #ffffff;">
-                                    All data has been cleared. The app will now reload with default settings.
+                                    All data has been reset to default. You are still logged in as admin.
                                 </p>
                                 <p style="color: #ffff00;">
-                                    <strong>Default Login:</strong><br>
+                                    <strong>Your Admin Credentials:</strong><br>
                                     Username: <code>admin</code><br>
                                     Password: <code>admin123</code>
                                 </p>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Force logout and reload
-                            st.session_state.authenticated = False
-                            st.session_state.current_user = None
-                            st.session_state.user_role = None
-                            st.session_state.employee_id = None
-                            
-                            st.info("🔄 Reloading app in 3 seconds...")
-                            time.sleep(3)
+                            st.info("🔄 Reloading app...")
+                            time.sleep(2)
                             st.rerun()
                             
                         except Exception as e:
